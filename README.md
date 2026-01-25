@@ -1,5 +1,20 @@
 # AI-Incident-Resolver
+
 Build an AI-driven observability & incident-analysis agent that plugs into Java Spring Boot microservices and understands the system end-to-end, enabling automatic root-cause analysis and fix suggestions for complex production incidents.
+
+## Architecture
+
+```
+Java Services (Spring Boot)
+    ↓ (OTLP gRPC/HTTP)
+OpenTelemetry Collector (Docker)
+    ↓ (OTLP gRPC)
+MCP Server (Python) :4319
+    ↓ (stdio)
+Cursor AI
+```
+
+The MCP server receives telemetry data directly from the OTEL collector over gRPC, enabling real-time data ingestion without file I/O.
 
 ## Services
 
@@ -14,8 +29,18 @@ Build an AI-driven observability & incident-analysis agent that plugs into Java 
 - Java 17+
 - Maven 3.6+
 - Docker Desktop
+- Python 3.10+ (for MCP server)
 
-### 1. Start OpenTelemetry Collector
+### 1. Install MCP Server Dependencies
+
+```powershell
+cd mcp-server
+pip install -e .
+# Or install dependencies directly:
+pip install -r requirements.txt
+```
+
+### 2. Start OpenTelemetry Collector
 
 ```powershell
 # PowerShell
@@ -32,7 +57,15 @@ Available commands:
 - `logs` - Show collector logs
 - `status` - Show collector status
 
-### 2. Start Services with OpenTelemetry Instrumentation
+The collector runs in Docker and exposes the following endpoints:
+- **OTLP gRPC**: `localhost:4317` - Primary receiver for Java agent
+- **OTLP HTTP**: `localhost:4318` - HTTP receiver
+- **Health Check**: `localhost:13133` - Health status endpoint
+- **Prometheus Metrics**: `localhost:8888/metrics` - Metrics endpoint
+- **zPages**: `localhost:55679/debug/tracez` - Debug information
+- **pprof**: `localhost:1777` - Performance profiler
+
+### 3. Start Services with OpenTelemetry Instrumentation
 
 ```powershell
 # PowerShell - Start all services
@@ -48,48 +81,50 @@ dev.bat order
 dev.bat payment
 ```
 
+The services are automatically instrumented with the OpenTelemetry Java agent (`opentelemetry-javaagent.jar`) and send telemetry to the collector.
+
+### 4. Enable MCP in Cursor
+
+The MCP server is automatically started by Cursor when configured. The configuration is in `.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "otel-incident-resolver": {
+      "command": "python",
+      "args": ["mcp-server/server.py"],
+      "cwd": "<workspace-path>"
+    }
+  }
+}
+```
+
+**Note:** Restart Cursor after configuring MCP to load the server.
+
 ## OpenTelemetry Configuration
 
-### Collector Endpoints
-| Endpoint | Port | Description |
-|----------|------|-------------|
-| OTLP gRPC | 4317 | Primary receiver for Java agent |
-| OTLP HTTP | 4318 | HTTP receiver |
-| Health Check | 13133 | Health status |
-| Metrics | 8888 | Prometheus metrics |
-| zPages | 55679 | Debug information |
+### Collector Configuration
 
-### MCP Server Integration (Cursor AI)
+The collector is configured via `otel-collector/otel-collector-config.yaml`:
+- Receives telemetry via OTLP (gRPC on 4317, HTTP on 4318)
+- Processes data with batching, memory limiting, and resource attributes
+- Exports to:
+  - **Debug exporter** (console logs for development)
+  - **OTLP exporter** to MCP server at `host.docker.internal:4319`
 
-The project includes an MCP (Model Context Protocol) server that exposes OpenTelemetry data to Cursor AI for incident analysis.
+### Java Agent Configuration
 
-**Architecture:** The MCP server receives telemetry data directly from the OTEL collector via gRPC (OTLP protocol) on port 4319, enabling real-time data ingestion without file I/O.
+Services are instrumented using the OpenTelemetry Java agent with the following environment variables:
+- `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317`
+- `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`
+- `OTEL_SERVICE_NAME` - Set per service (order-service, payment-service)
+- `OTEL_RESOURCE_ATTRIBUTES` - Service metadata
 
-#### Setup MCP Server
+## MCP Server Integration
 
-1. **Install Python dependencies:**
+The MCP (Model Context Protocol) server exposes OpenTelemetry data to Cursor AI for incident analysis.
 
-```powershell
-cd mcp-server
-pip install -e .
-# Or install dependencies directly:
-pip install mcp grpcio opentelemetry-proto protobuf
-```
-
-2. **Start the OTEL Collector**:
-
-```powershell
-.\start-collector.ps1
-```
-
-The collector will forward telemetry data to the MCP server via gRPC (port 4319).
-
-3. **Enable MCP in Cursor:**
-   - The MCP configuration is already set up in `.cursor/mcp.json`
-   - Restart Cursor to load the MCP server
-   - The MCP server will automatically start when Cursor launches
-
-#### Available MCP Tools
+### Available MCP Tools
 
 | Tool | Description |
 |------|-------------|
@@ -100,11 +135,12 @@ The collector will forward telemetry data to the MCP server via gRPC (port 4319)
 | `get_errors` | Get recent errors for incident analysis |
 | `analyze_incident` | Generate incident analysis report |
 | `get_service_health` | Get health summary for a specific service |
+| `get_receiver_status` | Get status of the OTLP receiver |
 
-#### Available MCP Resources
+### Available MCP Resources
 
-| Resource | Description |
-|----------|-------------|
+| Resource URI | Description |
+|--------------|-------------|
 | `otel://traces/recent` | Recent trace spans |
 | `otel://logs/recent` | Recent log records |
 | `otel://metrics/current` | Current metrics |
@@ -112,13 +148,14 @@ The collector will forward telemetry data to the MCP server via gRPC (port 4319)
 | `otel://errors/recent` | Recent errors |
 | `otel://stats` | Telemetry statistics |
 
-#### Using with Cursor AI
+### Using with Cursor AI
 
 Once configured, you can ask Cursor AI questions like:
 - "What errors are occurring in my services?"
 - "Analyze the recent incidents"
 - "Show me the health of order-service"
 - "Get traces for the payment-service"
+- "What is the status of the OTLP receiver?"
 
 The AI will use the MCP tools to query your live telemetry data and provide insights.
 
