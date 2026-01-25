@@ -40,7 +40,7 @@ function Start-OrderService {
         }
         
         Write-Host "Running: java -javaagent:..\$OTEL_JAR -jar $($jarFile.FullName)" -ForegroundColor Cyan
-        Start-Process -FilePath "java" -ArgumentList "-javaagent:..\$OTEL_JAR", "-jar", $jarFile.FullName -NoNewWindow
+        Start-Process -FilePath "java" -ArgumentList "-javaagent:`"..\$OTEL_JAR`"", "-jar", "`"$($jarFile.FullName)`"" -NoNewWindow
     }
     finally {
         Pop-Location
@@ -69,7 +69,7 @@ function Start-PaymentService {
         }
         
         Write-Host "Running: java -javaagent:..\$OTEL_JAR -jar $($jarFile.FullName)" -ForegroundColor Cyan
-        Start-Process -FilePath "java" -ArgumentList "-javaagent:..\$OTEL_JAR", "-jar", $jarFile.FullName -NoNewWindow
+        Start-Process -FilePath "java" -ArgumentList "-javaagent:`"..\$OTEL_JAR`"", "-jar", "`"$($jarFile.FullName)`"" -NoNewWindow
     }
     finally {
         Pop-Location

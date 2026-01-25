@@ -46,9 +46,16 @@ exporters:
     headers:
       x-source: "otel-collector"
 
-  # File exporter for debugging (optional)
-  file:
-    path: /var/log/otel/telemetry.json
+  # File exporters for MCP server integration
+  # These files are watched by the MCP server for Cursor AI integration
+  file/traces:
+    path: /telemetry/traces.jsonl
+  
+  file/logs:
+    path: /telemetry/logs.jsonl
+  
+  file/metrics:
+    path: /telemetry/metrics.jsonl
 
 extensions:
   # Health check extension
@@ -71,22 +78,22 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [debug]
-      # exporters: [debug, otlp/mcp]
+      exporters: [debug, file/traces]
+      # exporters: [debug, otlp/mcp, file/traces]
 
     # Metrics pipeline
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [debug]
-      # exporters: [debug, otlp/mcp]
+      exporters: [debug, file/metrics]
+      # exporters: [debug, otlp/mcp, file/metrics]
 
     # Logs pipeline
     logs:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [debug]
-      # exporters: [debug, otlp/mcp]
+      exporters: [debug, file/logs]
+      # exporters: [debug, otlp/mcp, file/logs]
 
   telemetry:
     logs:
