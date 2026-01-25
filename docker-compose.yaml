@@ -25,6 +25,8 @@ services:
       - "1777:1777"
     environment:
       - OTEL_LOG_LEVEL=info
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - otel-network
     # Note: Container uses distroless image without curl/wget

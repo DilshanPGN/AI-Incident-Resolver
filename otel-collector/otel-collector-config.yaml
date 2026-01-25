@@ -40,8 +40,9 @@ exporters:
   # OTLP exporter to MCP server
   # Update the endpoint to your MCP server address
   # For gRPC, use format: host:port (without http://) or http://host:port
+  # On Windows/Mac Docker, use host.docker.internal to reach host machine
   otlp/mcp:
-    endpoint: "localhost:4319"
+    endpoint: "host.docker.internal:4319"
     tls:
       insecure: true
     headers:
