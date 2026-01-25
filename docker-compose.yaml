@@ -1,0 +1,36 @@
+# Docker Compose for OpenTelemetry Collector
+# Usage: docker-compose up -d
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+      - ./otel-collector/logs:/var/log/otel
+    ports:
+      # OTLP gRPC receiver
+      - "4317:4317"
+      # OTLP HTTP receiver
+      - "4318:4318"
+      # Health check
+      - "13133:13133"
+      # Prometheus metrics
+      - "8888:8888"
+      # zPages
+      - "55679:55679"
+      # pprof
+      - "1777:1777"
+    environment:
+      - OTEL_LOG_LEVEL=info
+    networks:
+      - otel-network
+    # Note: Container uses distroless image without curl/wget
+    # Health is verified externally by start-collector script
+
+networks:
+  otel-network:
+    driver: bridge
+    name: otel-network
