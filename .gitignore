@@ -4,3 +4,7 @@
 /order-service/.idea/
 /payment-service/.idea/
 /payment-service/target/
+/.cursor/debug.log
+/telemetry/logs.jsonl
+/telemetry/metrics.jsonl
+/telemetry/traces.jsonl
