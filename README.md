@@ -63,6 +63,8 @@ dev.bat payment
 
 The project includes an MCP (Model Context Protocol) server that exposes OpenTelemetry data to Cursor AI for incident analysis.
 
+**Architecture:** The MCP server receives telemetry data directly from the OTEL collector via gRPC (OTLP protocol) on port 4319, enabling real-time data ingestion without file I/O.
+
 #### Setup MCP Server
 
 1. **Install Python dependencies:**
@@ -71,14 +73,16 @@ The project includes an MCP (Model Context Protocol) server that exposes OpenTel
 cd mcp-server
 pip install -e .
 # Or install dependencies directly:
-pip install mcp watchdog pydantic
+pip install mcp grpcio opentelemetry-proto protobuf
 ```
 
-2. **Start the OTEL Collector** (creates telemetry directory):
+2. **Start the OTEL Collector**:
 
 ```powershell
 .\start-collector.ps1
 ```
+
+The collector will forward telemetry data to the MCP server via gRPC (port 4319).
 
 3. **Enable MCP in Cursor:**
    - The MCP configuration is already set up in `.cursor/mcp.json`
@@ -129,8 +133,7 @@ The AI will use the MCP tools to query your live telemetry data and provide insi
 │   ├── pyproject.toml       # Python dependencies
 │   ├── server.py            # MCP server implementation
 │   ├── telemetry_store.py   # In-memory telemetry storage
-│   └── file_watcher.py      # Watches OTEL file exports
-├── telemetry/               # OTEL file exports (auto-created)
+│   └── otlp_receiver.py     # OTLP gRPC receiver (receives data from collector)
 ├── .cursor/mcp.json         # Cursor MCP configuration
 ├── docker-compose.yaml      # Docker Compose for OTEL Collector
 ├── opentelemetry-javaagent.jar

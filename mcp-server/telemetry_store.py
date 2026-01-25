@@ -5,30 +5,9 @@ Provides query methods for filtering by service, time range, and error status.
 
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Union
-import json
 import threading
-from pathlib import Path
-
-# #region agent log
-DEBUG_LOG_PATH = Path(__file__).parent.parent / ".cursor" / "debug.log"
-def _debug_log(location: str, message: str, data: dict):
-    try:
-        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-            log_entry = {
-                "timestamp": datetime.utcnow().isoformat(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "location": location,
-                "message": message,
-                "data": data
-            }
-            f.write(json.dumps(log_entry) + "\n")
-    except Exception:
-        pass
-# #endregion
-
 
 @dataclass
 class Span:
@@ -96,38 +75,20 @@ class TelemetryStore:
     def add_span(self, span: Span) -> None:
         """Add a span to the store."""
         with self._lock:
-            # #region agent log
-            _debug_log("telemetry_store.py:add_span", "Adding span", {"trace_id": span.trace_id, "span_id": span.span_id, "service": span.service_name, "name": span.name, "is_error": span.is_error})
-            # #endregion
             self._spans.append(span)
             self._services.add(span.service_name)
-            # #region agent log
-            _debug_log("telemetry_store.py:add_span", "Span added", {"total_spans": len(self._spans), "services": list(self._services)})
-            # #endregion
     
     def add_log(self, log: LogRecord) -> None:
         """Add a log record to the store."""
         with self._lock:
-            # #region agent log
-            _debug_log("telemetry_store.py:add_log", "Adding log", {"service": log.service_name, "severity": log.severity, "is_error": log.is_error, "body_preview": log.body[:100]})
-            # #endregion
             self._logs.append(log)
             self._services.add(log.service_name)
-            # #region agent log
-            _debug_log("telemetry_store.py:add_log", "Log added", {"total_logs": len(self._logs), "services": list(self._services)})
-            # #endregion
     
     def add_metric(self, metric: MetricDataPoint) -> None:
         """Add a metric data point to the store."""
         with self._lock:
-            # #region agent log
-            _debug_log("telemetry_store.py:add_metric", "Adding metric", {"service": metric.service_name, "name": metric.name, "value": metric.value})
-            # #endregion
             self._metrics.append(metric)
             self._services.add(metric.service_name)
-            # #region agent log
-            _debug_log("telemetry_store.py:add_metric", "Metric added", {"total_metrics": len(self._metrics), "services": list(self._services)})
-            # #endregion
     
     def get_services(self) -> list[str]:
         """Get list of all discovered services."""
@@ -145,10 +106,6 @@ class TelemetryStore:
         with self._lock:
             spans = list(self._spans)
         
-        # #region agent log
-        _debug_log("telemetry_store.py:get_recent_spans", "Querying spans", {"total_spans": len(spans), "limit": limit, "service": service, "errors_only": errors_only, "since": since.isoformat() if since else None})
-        # #endregion
-        
         # Apply filters
         if service:
             spans = [s for s in spans if s.service_name == service]
@@ -159,13 +116,7 @@ class TelemetryStore:
         
         # Return most recent first
         spans.sort(key=lambda s: s.start_time, reverse=True)
-        result = spans[:limit]
-        
-        # #region agent log
-        _debug_log("telemetry_store.py:get_recent_spans", "Returning spans", {"result_count": len(result)})
-        # #endregion
-        
-        return result
+        return spans[:limit]
     
     def get_recent_logs(
         self,

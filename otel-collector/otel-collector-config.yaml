@@ -39,23 +39,13 @@ exporters:
 
   # OTLP exporter to MCP server
   # Update the endpoint to your MCP server address
+  # For gRPC, use format: host:port (without http://) or http://host:port
   otlp/mcp:
     endpoint: "localhost:4319"
     tls:
       insecure: true
     headers:
       x-source: "otel-collector"
-
-  # File exporters for MCP server integration
-  # These files are watched by the MCP server for Cursor AI integration
-  file/traces:
-    path: /telemetry/traces.jsonl
-  
-  file/logs:
-    path: /telemetry/logs.jsonl
-  
-  file/metrics:
-    path: /telemetry/metrics.jsonl
 
 extensions:
   # Health check extension
@@ -78,22 +68,19 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [debug, file/traces]
-      # exporters: [debug, otlp/mcp, file/traces]
+      exporters: [debug, otlp/mcp]
 
     # Metrics pipeline
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [debug, file/metrics]
-      # exporters: [debug, otlp/mcp, file/metrics]
+      exporters: [debug, otlp/mcp]
 
     # Logs pipeline
     logs:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
-      exporters: [debug, file/logs]
-      # exporters: [debug, otlp/mcp, file/logs]
+      exporters: [debug, otlp/mcp]
 
   telemetry:
     logs:

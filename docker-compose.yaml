@@ -10,8 +10,6 @@ services:
     volumes:
       - ./otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
       - ./otel-collector/logs:/var/log/otel
-      # Telemetry files for MCP server integration
-      - ./telemetry:/telemetry
     ports:
       # OTLP gRPC receiver
       - "4317:4317"

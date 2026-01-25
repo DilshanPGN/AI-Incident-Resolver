@@ -7,7 +7,7 @@ import asyncio
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -21,45 +21,27 @@ from mcp.types import (
 )
 
 from telemetry_store import TelemetryStore, Span, LogRecord, MetricDataPoint
-from file_watcher import TelemetryWatcher
 
-# #region agent log
-DEBUG_LOG_PATH = Path(__file__).parent.parent / ".cursor" / "debug.log"
-def _debug_log(location: str, message: str, data: dict):
-    try:
-        with open(DEBUG_LOG_PATH, 'a', encoding='utf-8') as f:
-            log_entry = {
-                "timestamp": datetime.utcnow().isoformat(),
-                "sessionId": "debug-session",
-                "runId": "run1",
-                "location": location,
-                "message": message,
-                "data": data
-            }
-            f.write(json.dumps(log_entry) + "\n")
-    except Exception:
-        pass
-# #endregion
-
+try:
+    from otlp_receiver import OTLPReceiver
+except ImportError as e:
+    print(f"ERROR: Failed to import OTLP receiver. Missing dependencies!", file=sys.stderr)
+    print(f"ERROR: {e}", file=sys.stderr)
+    print(f"", file=sys.stderr)
+    print(f"SOLUTION: Install dependencies using one of these methods:", file=sys.stderr)
+    print(f"  1. From mcp-server directory: pip install -e .", file=sys.stderr)
+    print(f"  2. Using requirements.txt: pip install -r mcp-server/requirements.txt", file=sys.stderr)
+    print(f"  3. Direct install: pip install grpcio opentelemetry-proto protobuf", file=sys.stderr)
+    print(f"", file=sys.stderr)
+    print(f"Note: Make sure you're using the same Python interpreter that Cursor uses.", file=sys.stderr)
+    raise
 
 # Initialize the MCP server
 server = Server("otel-incident-resolver")
 
-# Global store and watcher
+# Global store and OTLP receiver
 store = TelemetryStore(max_spans=10000, max_logs=10000, max_metrics=5000)
-watcher: Optional[TelemetryWatcher] = None
-
-
-def get_telemetry_path() -> Path:
-    """Get the path to the telemetry directory."""
-    # Look for telemetry directory relative to workspace
-    workspace = os.environ.get("OTEL_TELEMETRY_PATH", "")
-    if workspace:
-        return Path(workspace)
-    
-    # Default: look in parent directory's telemetry folder
-    script_dir = Path(__file__).parent.parent
-    return script_dir / "telemetry"
+otlp_receiver: Optional[OTLPReceiver] = None
 
 
 def format_span(span: Span) -> dict:
@@ -340,6 +322,14 @@ async def list_tools() -> list[Tool]:
                 "required": ["service"]
             }
         ),
+        Tool(
+            name="get_receiver_status",
+            description="Get status of the OTLP receiver including whether it's running and listening for data.",
+            inputSchema={
+                "type": "object",
+                "properties": {}
+            }
+        ),
     ]
 
 
@@ -347,28 +337,16 @@ async def list_tools() -> list[Tool]:
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     """Handle tool calls."""
     
-    # #region agent log
-    _debug_log("server.py:call_tool", "Tool called", {"tool_name": name, "arguments": arguments})
-    # #endregion
-    
     if name == "get_recent_traces":
         limit = arguments.get("limit", 20)
         service = arguments.get("service")
         errors_only = arguments.get("errors_only", False)
-        
-        # #region agent log
-        _debug_log("server.py:call_tool:get_recent_traces", "Querying traces", {"limit": limit, "service": service, "errors_only": errors_only})
-        # #endregion
         
         spans = store.get_recent_spans(
             limit=limit,
             service=service,
             errors_only=errors_only
         )
-        
-        # #region agent log
-        _debug_log("server.py:call_tool:get_recent_traces", "Traces retrieved", {"count": len(spans), "store_stats": store.get_stats()})
-        # #endregion
         
         result = {
             "count": len(spans),
@@ -564,6 +542,19 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         
         return [TextContent(type="text", text=json.dumps(health, indent=2))]
     
+    elif name == "get_receiver_status":
+        status = {
+            "otlp_receiver": {
+                "running": otlp_receiver.is_running if otlp_receiver else False,
+                "port": int(os.environ.get("OTLP_RECEIVER_PORT", "4319")),
+                "configured": otlp_receiver is not None
+            },
+            "store_stats": store.get_stats(),
+            "services_discovered": store.get_services()
+        }
+        
+        return [TextContent(type="text", text=json.dumps(status, indent=2))]
+    
     else:
         return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]
 
@@ -574,26 +565,19 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 async def main():
     """Run the MCP server."""
-    global watcher
+    global otlp_receiver
     
-    # #region agent log
-    _debug_log("server.py:main", "MCP server starting", {"store_stats": store.get_stats()})
-    # #endregion
+    # Start the OTLP receiver (network-based ingestion)
+    otlp_port = int(os.environ.get("OTLP_RECEIVER_PORT", "4319"))
     
-    # Start the telemetry watcher
-    telemetry_path = get_telemetry_path()
-    print(f"Watching telemetry directory: {telemetry_path}", file=sys.stderr)
-    
-    # #region agent log
-    _debug_log("server.py:main", "Initializing watcher", {"telemetry_path": str(telemetry_path), "path_exists": telemetry_path.exists()})
-    # #endregion
-    
-    watcher = TelemetryWatcher(store, telemetry_path)
-    watcher.start()
-    
-    # #region agent log
-    _debug_log("server.py:main", "Watcher started", {"is_running": watcher.is_running, "store_stats_after_start": store.get_stats()})
-    # #endregion
+    try:
+        otlp_receiver = OTLPReceiver(store, port=otlp_port)
+        await otlp_receiver.start()
+        print(f"OTLP receiver started on port {otlp_port}", file=sys.stderr)
+        print(f"MCP server ready. Waiting for telemetry data...", file=sys.stderr)
+    except Exception as e:
+        print(f"ERROR: Failed to start OTLP receiver: {e}", file=sys.stderr)
+        # Don't raise - allow MCP server to continue without receiver
     
     try:
         # Run the MCP server over stdio
@@ -604,9 +588,15 @@ async def main():
                 server.create_initialization_options()
             )
     finally:
-        if watcher:
-            watcher.stop()
+        if otlp_receiver:
+            try:
+                await otlp_receiver.stop()
+            except Exception as e:
+                print(f"ERROR: Failed to stop OTLP receiver: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        raise

@@ -5,6 +5,11 @@
 /payment-service/.idea/
 /payment-service/target/
 /.cursor/debug.log
-/telemetry/logs.jsonl
-/telemetry/metrics.jsonl
-/telemetry/traces.jsonl
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+# Telemetry files (no longer used - using gRPC/OTLP instead)
+# /telemetry/logs.jsonl
+# /telemetry/metrics.jsonl
+# /telemetry/traces.jsonl

@@ -8,13 +8,13 @@ MCP (Model Context Protocol) server that exposes OpenTelemetry telemetry data to
 Java Services (order, payment)
         ↓ (OTLP)
 OTEL Collector (4317)
-        ↓ (JSON files)
-    telemetry/
-        ↓ (file watcher)
-MCP Server (Python)
+        ↓ (OTLP gRPC)
+MCP Server (Python) :4319
         ↓ (stdio)
    Cursor AI
 ```
+
+The MCP server receives telemetry data directly from the OTEL collector over gRPC, enabling cloud deployments where services are distributed across containers/pods.
 
 ## Installation
 
@@ -23,7 +23,7 @@ MCP Server (Python)
 pip install -e .
 
 # Or install dependencies directly
-pip install mcp watchdog pydantic
+pip install mcp grpcio opentelemetry-proto protobuf
 ```
 
 ## Usage
@@ -39,11 +39,11 @@ python server.py
 ### `telemetry_store.py`
 In-memory storage for traces, metrics, and logs with query methods for filtering.
 
-### `file_watcher.py`
-Watches the `telemetry/` directory for OTEL JSON exports and parses them into the store.
+### `otlp_receiver.py`
+OTLP gRPC receiver that accepts telemetry data directly from the OTEL collector over the network.
 
 ### `server.py`
-MCP server implementation that exposes tools and resources to Cursor AI.
+MCP server implementation that exposes tools and resources to Cursor AI. Manages the OTLP receiver.
 
 ## MCP Tools
 
@@ -72,7 +72,7 @@ MCP server implementation that exposes tools and resources to Cursor AI.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OTEL_TELEMETRY_PATH` | Path to telemetry directory | `../telemetry` |
+| `OTLP_RECEIVER_PORT` | Port for OTLP gRPC receiver | `4319` |
 
 ## Configuration
 
