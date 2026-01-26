@@ -103,6 +103,24 @@ MCP server implementation that exposes tools and resources to Cursor AI. Manages
 
 ## Configuration
 
+### Git Repository Configuration
+
+The MCP server can be configured to access specific git repositories. Edit `git-repos.json` to add the repositories you want the MCP to access:
+
+```json
+{
+  "repositories": [
+    {
+      "url": "https://github.com/owner/repository-name",
+      "name": "Repository Display Name",
+      "description": "Optional description of what this repository contains"
+    }
+  ]
+}
+```
+
+**Note:** Copy `git-repos.json.example` to `git-repos.json` and customize it with your repository URLs.
+
 ### Cursor MCP Configuration
 
 The Cursor MCP configuration is in `.cursor/mcp.json`:

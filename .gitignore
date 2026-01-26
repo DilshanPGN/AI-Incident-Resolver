@@ -16,3 +16,6 @@ uv.lock
 /order-service/target/
 /payment-service/target/
 /.vscode/settings.json
+
+# MCP Configuration files
+mcp-server/git-repos.json
