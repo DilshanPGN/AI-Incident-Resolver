@@ -16,6 +16,30 @@ Cursor AI
 
 The MCP server receives telemetry data directly from the OTEL collector over gRPC, enabling real-time data ingestion without file I/O.
 
+## Project Structure
+
+This project contains two MCP servers with different purposes:
+
+### 1. Base MCP Server (`base-mcp-server/`)
+Provides access to Wiley ALM APIs, database queries, and product service operations.
+
+**Tools:**
+- Search license entitlements and institutions
+- Execute SQL queries on order management database
+- Create and retrieve products from product service
+
+**Documentation:** See [`base-mcp-server/README.md`](base-mcp-server/README.md)
+
+### 2. Telemetry MCP Server (`mcp-server/`)
+Receives and stores OpenTelemetry data from microservices for observability and incident analysis.
+
+**Features:**
+- Real-time telemetry ingestion via OTLP gRPC
+- Trace, metric, and log storage
+- AI-powered incident analysis
+
+**Documentation:** See [`mcp-server/README.md`](mcp-server/README.md)
+
 ## Services
 
 | Service | Port | Description |
@@ -34,6 +58,11 @@ The MCP server receives telemetry data directly from the OTEL collector over gRP
 ### 1. Install MCP Server Dependencies
 
 ```powershell
+# For Wiley ALM MCP Server (entitlement, database, product service)
+cd base-mcp-server
+pip install -r requirements.txt
+
+# For Telemetry MCP Server (OpenTelemetry observability)
 cd mcp-server
 pip install -e .
 # Or install dependencies directly:
