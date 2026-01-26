@@ -1,0 +1,7 @@
+[project]
+name = "wiley-alm-mcp"
+version = "0.1.0"
+description = "MCP server for ALM Entitlements"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
