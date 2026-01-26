@@ -1,15 +1,13 @@
-/.idea/
-/.vscode/
-/order-service/target/
-/order-service/.idea/
-/payment-service/.idea/
-/payment-service/target/
-/.cursor/debug.log
-# Python cache
+# Python-generated files
 __pycache__/
-*.py[cod]
-*$py.class
-# Telemetry files (no longer used - using gRPC/OTLP instead)
-# /telemetry/logs.jsonl
-# /telemetry/metrics.jsonl
-# /telemetry/traces.jsonl
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+.idea
+uv.lock
