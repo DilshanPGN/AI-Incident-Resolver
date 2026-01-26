@@ -563,11 +563,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 # Main Entry Point
 # ============================================================================
 
-async def main():
-    """Run the MCP server."""
+async def start_otlp_receiver():
+    """Start the OTLP receiver as a background task."""
     global otlp_receiver
     
-    # Start the OTLP receiver (network-based ingestion)
     otlp_port = int(os.environ.get("OTLP_RECEIVER_PORT", "4319"))
     
     try:
@@ -578,16 +577,36 @@ async def main():
     except Exception as e:
         print(f"ERROR: Failed to start OTLP receiver: {e}", file=sys.stderr)
         # Don't raise - allow MCP server to continue without receiver
+
+
+async def main():
+    """Run the MCP server."""
+    # Start the OTLP receiver as a background task after MCP server is ready
+    receiver_task = None
     
     try:
         # Run the MCP server over stdio
+        # Start the OTLP receiver as a background task once stdio is connected
         async with stdio_server() as (read_stream, write_stream):
+            # Start OTLP receiver in background after stdio connection is established
+            receiver_task = asyncio.create_task(start_otlp_receiver())
+            
+            # Run the MCP server (this will handle initialization immediately)
             await server.run(
                 read_stream,
                 write_stream,
                 server.create_initialization_options()
             )
     finally:
+        # Cancel receiver task if still running
+        if receiver_task and not receiver_task.done():
+            receiver_task.cancel()
+            try:
+                await receiver_task
+            except asyncio.CancelledError:
+                pass
+        
+        # Stop OTLP receiver if it was started
         if otlp_receiver:
             try:
                 await otlp_receiver.stop()
