@@ -188,6 +188,68 @@ Once configured, you can ask Cursor AI questions like:
 
 The AI will use the MCP tools to query your live telemetry data and provide insights.
 
+## Troubleshooting
+
+### Collector Connection Errors
+
+If you see connection errors like `connection refused` when the collector tries to connect to the MCP server:
+
+1. **Verify MCP Server is Running**: The MCP server must be running before the collector starts. Check Cursor's MCP server status or run the server manually:
+   ```powershell
+   cd mcp-server
+   python server.py
+   ```
+   You should see: `OTLP receiver started on port 4319`
+
+2. **Check Windows Firewall**: Windows Firewall may be blocking port 4319. To allow it:
+   ```powershell
+   # Run PowerShell as Administrator
+   New-NetFirewallRule -DisplayName "OTLP Receiver" -Direction Inbound -LocalPort 4319 -Protocol TCP -Action Allow
+   ```
+
+3. **Verify Startup Order**: Start the MCP server first, then start the collector:
+   ```powershell
+   # 1. Start MCP server (via Cursor or manually)
+   # 2. Then start collector
+   .\start-collector.ps1
+   ```
+
+4. **Check Network Connectivity**: The collector uses `host.docker.internal:4319` to reach the host. Verify this works:
+   ```powershell
+   # From inside the container (if needed)
+   docker exec otel-collector ping host.docker.internal
+   ```
+
+5. **Restart Collector**: After starting the MCP server, restart the collector:
+   ```powershell
+   .\start-collector.ps1 restart
+   ```
+
+6. **Check Collector Logs**: Review collector logs for detailed error messages:
+   ```powershell
+   .\start-collector.ps1 logs
+   ```
+
+7. **Windows Docker Desktop Issue**: If `host.docker.internal` doesn't work (connection refused errors), the collector config uses the WSL/Hyper-V adapter IP (`172.24.224.1`) instead. If your system has a different IP, update `otel-collector/otel-collector-config.yaml`:
+   ```powershell
+   # Find your WSL/Hyper-V adapter IP
+   Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -like "*WSL*" -or $_.InterfaceAlias -like "*Hyper-V*" }
+   
+   # Then update the endpoint in otel-collector-config.yaml:
+   # endpoint: "YOUR_IP:4319"
+   ```
+
+The collector is configured with retry logic and will automatically retry connections, so if the MCP server starts after the collector, it should connect once the server is ready.
+
+### No Telemetry Data
+
+If no telemetry data appears in the MCP server:
+
+1. Verify services are running: `.\dev.ps1`
+2. Check collector is receiving data: `.\start-collector.ps1 logs`
+3. Verify MCP receiver status using the `get_receiver_status` tool in Cursor
+4. Check that services are instrumented with the Java agent (check service logs)
+
 ## Project Structure
 
 ```
