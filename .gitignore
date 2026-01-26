@@ -11,3 +11,8 @@ wheels/
 .env
 .idea
 uv.lock
+/order-service/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+/payment-service/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+/order-service/target/
+/payment-service/target/
+/.vscode/settings.json
