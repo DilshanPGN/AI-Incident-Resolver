@@ -1,0 +1,46 @@
+# MCP Server Instructions
+
+This file contains instructions that guide the AI assistant on how to use this MCP server effectively.
+
+## OpenTelemetry Incident Analysis
+
+This MCP server provides access to OpenTelemetry telemetry data (traces, metrics, and logs) for incident analysis and debugging.
+
+### Code Location Information
+
+The server automatically extracts and exposes code location information from telemetry data when available:
+- **code.filepath** - Source file path
+- **code.function** - Function/method name
+- **code.lineno** - Line number
+- **code.namespace** - Package/namespace
+
+This information appears in the `code_location` field of spans and logs when instrumentation includes it. Use `get_code_locations` to filter telemetry by code location.
+
+### Tool Usage Guidelines
+
+1. **For Incident Analysis:**
+   - Start with `get_errors` to identify recent failures (includes code location summary)
+   - Use `analyze_incident` for a comprehensive summary of issues (includes error code locations)
+   - Use `get_service_health` to check specific service status
+   - Use `get_code_locations` to find all telemetry from a specific file or function
+
+2. **For Debugging:**
+   - Use `get_trace_by_id` to follow a specific request through the system
+   - Use `get_recent_traces` with `errors_only=true` to find failed operations
+   - Use `get_recent_logs` with `errors_only=true` to find error messages
+   - Use `get_code_locations` with filepath/function filters to investigate specific code areas
+
+3. **For Performance Analysis:**
+   - Use `get_recent_metrics` to check system performance
+   - Look for slow spans in trace analysis (duration_ms > 1000)
+   - Check service health for average duration metrics
+   - Slow operations in `analyze_incident` include code location when available
+
+### Best Practices
+
+- Always check `get_receiver_status` first to ensure data is being collected
+- Use appropriate limits to avoid overwhelming the response
+- Filter by service name when investigating specific services
+- Combine trace and log data for complete incident context
+- When errors occur, check the `error_code_locations` field to identify problematic code areas
+- Use `get_code_locations` to trace all telemetry from a specific file or function during debugging

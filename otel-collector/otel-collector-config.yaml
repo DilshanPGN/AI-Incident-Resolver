@@ -40,11 +40,21 @@ exporters:
   # OTLP exporter to MCP server
   # Update the endpoint to your MCP server address
   # For gRPC, use format: host:port (without http://) or http://host:port
-  # On Windows/Mac Docker, use host.docker.internal to reach host machine
+  # On Windows Docker Desktop, host.docker.internal may not work reliably.
+  # Try using the WSL/Hyper-V adapter IP (usually 172.24.224.1) or your host IP.
+  # You can find it with: Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -like "*WSL*" -or $_.InterfaceAlias -like "*Hyper-V*" }
   otlp/mcp:
-    endpoint: "host.docker.internal:4319"
+    endpoint: "172.24.224.1:4319"
     tls:
       insecure: true
+    # Retry configuration to handle connection issues
+    retry_on_failure:
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    # Queue configuration to buffer during connection issues
+    sending_queue:
+      queue_size: 5000
     headers:
       x-source: "otel-collector"
 

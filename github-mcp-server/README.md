@@ -4,6 +4,51 @@
 
 The GitHub MCP Server connects AI tools directly to GitHub's platform. This gives AI agents, assistants, and chatbots the ability to read repositories and code files, manage issues and PRs, analyze code, and automate workflows. All through natural language interactions.
 
+## In This Project (AI-Incident-Resolver)
+
+This directory contains the **GitHub MCP Server** as integrated into the AI-Incident-Resolver project. It runs alongside:
+
+- **Telemetry MCP Server** (`../mcp-server/`) – OpenTelemetry traces, metrics, logs, incident analysis
+- **Base MCP Server** (`../base-mcp-server/`) – Entitlement/institution APIs, database, product/order services
+
+### Adding to Cursor
+
+To use the GitHub MCP Server with Cursor in this workspace, add it under `mcpServers` in `.cursor/mcp.json` (same file used for the other MCP servers). Example:
+
+**Remote (hosted):**
+```json
+"github": {
+  "type": "http",
+  "url": "https://api.githubcopilot.com/mcp/"
+}
+```
+
+**Local (Docker, with PAT):**
+```json
+"github": {
+  "command": "docker",
+  "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"],
+  "env": {
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "${input:github_token}"
+  }
+}
+```
+
+**Local (built binary):**
+```json
+"github": {
+  "command": "<path-to-repo>/github-mcp-server/github-mcp-server",
+  "args": ["stdio"],
+  "env": {
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "<your-token>"
+  }
+}
+```
+
+For full project setup (Telemetry, Base, and GitHub MCP servers), see the [main project README](../README.md).
+
+---
+
 ### Use Cases
 
 - Repository Management: Browse and query code, search files, analyze commits, and understand project structure across any repository you have access to.

@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "otel-incident-resolver": {
-      "command": "py",
-      "args": ["-3.14", "mcp-server/server.py"],
-      "cwd": "c:\\Development\\innovation\\AI Incident Resolver\\AI-Incident-Resolver"
-    }
-  }
-}

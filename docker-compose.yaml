@@ -27,12 +27,6 @@ services:
       - OTEL_LOG_LEVEL=info
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    networks:
-      - otel-network
+    # Note: Using default bridge network for better host.docker.internal support on Windows
     # Note: Container uses distroless image without curl/wget
     # Health is verified externally by start-collector script
-
-networks:
-  otel-network:
-    driver: bridge
-    name: otel-network

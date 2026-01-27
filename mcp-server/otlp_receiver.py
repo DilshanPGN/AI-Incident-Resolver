@@ -17,7 +17,7 @@ from opentelemetry.proto.logs.v1 import logs_pb2
 from opentelemetry.proto.common.v1 import common_pb2
 from opentelemetry.proto.resource.v1 import resource_pb2
 
-from telemetry_store import TelemetryStore, Span, LogRecord, MetricDataPoint, parse_otel_timestamp
+from telemetry_store import TelemetryStore, Span, LogRecord, MetricDataPoint, parse_otel_timestamp, extract_code_info
 
 def extract_resource_attributes(resource: resource_pb2.Resource) -> dict:
     """Extract attributes from resource."""
@@ -82,6 +82,10 @@ def parse_span_from_proto(resource: resource_pb2.Resource, scope_span: trace_pb2
         span_id_hex = span_pb.span_id.hex() if span_pb.span_id else ""
         parent_span_id_hex = span_pb.parent_span_id.hex() if span_pb.parent_span_id and len(span_pb.parent_span_id) > 0 else None
         
+        # Extract attributes and code information
+        attrs = extract_attributes(span_pb.attributes)
+        filepath, function, lineno, namespace = extract_code_info(attrs)
+        
         span = Span(
             trace_id=trace_id_hex,
             span_id=span_id_hex,
@@ -91,8 +95,12 @@ def parse_span_from_proto(resource: resource_pb2.Resource, scope_span: trace_pb2
             start_time=start_time,
             end_time=end_time,
             status_code=status_code,
-            attributes=extract_attributes(span_pb.attributes),
-            events=[{"name": e.name, "time": e.time_unix_nano} for e in span_pb.events]
+            attributes=attrs,
+            events=[{"name": e.name, "time": e.time_unix_nano} for e in span_pb.events],
+            code_filepath=filepath,
+            code_function=function,
+            code_lineno=lineno,
+            code_namespace=namespace
         )
         spans.append(span)
     
@@ -148,6 +156,10 @@ def parse_log_from_proto(resource: resource_pb2.Resource, scope_log: logs_pb2.Sc
         trace_id = log_pb.trace_id.hex() if log_pb.trace_id and len(log_pb.trace_id) > 0 else None
         span_id = log_pb.span_id.hex() if log_pb.span_id and len(log_pb.span_id) > 0 else None
         
+        # Extract attributes and code information
+        attrs = extract_attributes(log_pb.attributes)
+        filepath, function, lineno, namespace = extract_code_info(attrs)
+        
         log = LogRecord(
             timestamp=parse_otel_timestamp(log_pb.time_unix_nano),
             severity=severity,
@@ -155,7 +167,11 @@ def parse_log_from_proto(resource: resource_pb2.Resource, scope_log: logs_pb2.Sc
             service_name=service_name,
             trace_id=trace_id,
             span_id=span_id,
-            attributes=extract_attributes(log_pb.attributes)
+            attributes=attrs,
+            code_filepath=filepath,
+            code_function=function,
+            code_lineno=lineno,
+            code_namespace=namespace
         )
         logs.append(log)
     
