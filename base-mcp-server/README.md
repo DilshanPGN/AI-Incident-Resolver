@@ -4,11 +4,12 @@ A Model Context Protocol (MCP) server that provides AI assistants with access to
 
 ## Overview
 
-This MCP server exposes 7 powerful tools for interacting with Wiley's ALM ecosystem:
+This MCP server exposes 12 powerful tools for interacting with Wiley's ALM ecosystem:
 
 - **Wiley ALM API Tools** - Search entitlements and institutions
 - **Database Query Tools** - Execute SQL queries on the order management database
 - **Product Service Tools** - Create and retrieve products from the product microservice
+- **Order Service Tools** - Full CRUD operations for orders from the order microservice
 
 ## Directory Structure
 
@@ -55,6 +56,9 @@ DB_PASSWORD=your_db_password
 
 # Product Service Configuration
 PRODUCT_SERVICE_URL=http://localhost:8083
+
+# Order Service Configuration
+ORDER_SERVICE_URL=http://localhost:8081
 ```
 
 See `env.example` for a template.
@@ -76,7 +80,8 @@ Update your Cursor MCP configuration (`~/.cursor/mcp.json` or `C:\Users\{usernam
         "WILEY_CLIENT_ID": "ALM-API",
         "WILEY_CLIENT_SECRET": "your-secret",
         "WILEY_ALM_BASE_URL": "https://almapi-dev.alm.private.wiley.host",
-        "PRODUCT_SERVICE_URL": "http://localhost:8083"
+        "PRODUCT_SERVICE_URL": "http://localhost:8083",
+        "ORDER_SERVICE_URL": "http://localhost:8081"
       }
     }
   }
@@ -150,6 +155,48 @@ Retrieve a product by its ID.
 Get product with ID "PROD-001"
 ```
 
+### 4. Order Service Tools
+
+#### `create_order`
+Create a new order in the order service.
+
+**Example:**
+```
+Create an order for product "Laptop" with quantity 2 and price 1000
+```
+
+#### `get_all_orders`
+Retrieve all orders from the order service.
+
+**Example:**
+```
+Get all orders
+```
+
+#### `get_order_by_id`
+Retrieve an order by its ID.
+
+**Example:**
+```
+Get order with ID 1
+```
+
+#### `update_order`
+Update an existing order.
+
+**Example:**
+```
+Update order 1 with product name "Desktop", quantity 1, and price 1500
+```
+
+#### `delete_order`
+Delete an order by its ID.
+
+**Example:**
+```
+Delete order with ID 1
+```
+
 ## Testing
 
 ### Test Product Service Integration
@@ -193,7 +240,8 @@ Cursor AI Client
 MCP Server (entitlement-stdio.py)
     ├── → Wiley ALM APIs (OAuth + REST)
     ├── → MySQL Database (order_management)
-    └── → Product Service (Spring Boot @ :8083)
+    ├── → Product Service (Spring Boot @ :8083)
+    └── → Order Service (Spring Boot @ :8081)
 ```
 
 ## Features
@@ -211,6 +259,7 @@ MCP Server (entitlement-stdio.py)
 - Access to Wiley ALM APIs
 - MySQL database access
 - Product Service running on localhost:8083 (optional)
+- Order Service running on localhost:8081 (optional)
 
 ## Dependencies
 
@@ -240,6 +289,12 @@ MCP Server (entitlement-stdio.py)
 2. Verify service is running at configured URL
 3. Check `PRODUCT_SERVICE_URL` environment variable
 
+### Order Service Connection Failed
+
+1. Start the order service: `cd order-service && mvn spring-boot:run`
+2. Verify service is running at configured URL (default: http://localhost:8081)
+3. Check `ORDER_SERVICE_URL` environment variable
+
 ## License
 
 Wiley Internal Use Only
@@ -247,6 +302,7 @@ Wiley Internal Use Only
 ## Support
 
 For questions or issues, contact the ALM team.
+
 
 
 

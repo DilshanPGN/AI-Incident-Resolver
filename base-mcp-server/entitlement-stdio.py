@@ -38,6 +38,12 @@ class ProductServiceConfig:
         load_dotenv()
         self.base_url = os.getenv("PRODUCT_SERVICE_URL", "http://localhost:8083")
 
+# Order Service configuration
+class OrderServiceConfig:
+    def __init__(self):
+        load_dotenv()
+        self.base_url = os.getenv("ORDER_SERVICE_URL", "http://localhost:8081")
+
 # Token cache
 class TokenCache:
     def __init__(self):
@@ -57,6 +63,7 @@ oauth_config = OAuthConfig()
 token_cache = TokenCache()
 db_config = DBConfig()
 product_service_config = ProductServiceConfig()
+order_service_config = OrderServiceConfig()
 
 # Get OAuth access token
 async def get_access_token() -> str:
@@ -500,6 +507,251 @@ async def get_product(productId: str) -> dict:
             "error": str(e)
         }
 
+@mcp.tool()
+async def create_order(
+        productName: str,
+        quantity: int,
+        price: int
+) -> dict:
+    """Create a new order in the order service.
+    
+    Args:
+        productName: Name of the product being ordered (required)
+        quantity: Quantity of the product (required)
+        price: Price of the product (required)
+    
+    Returns:
+        Dictionary with order creation response
+    """
+    # Build request payload
+    payload = {
+        "productName": productName,
+        "quantity": quantity,
+        "price": price
+    }
+    
+    url = f"{order_service_config.base_url}/orders"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                json=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-request-id": f"mcp_{uuid.uuid4()}"
+                }
+            )
+            
+            if response.status_code == 201:
+                return {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "data": response.json()
+                }
+            else:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": response.text
+                }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@mcp.tool()
+async def get_all_orders() -> dict:
+    """Retrieve all orders from the order service.
+    
+    Returns:
+        Dictionary with list of all orders
+    """
+    url = f"{order_service_config.base_url}/orders"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                url,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-request-id": f"mcp_{uuid.uuid4()}"
+                }
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "data": response.json()
+                }
+            else:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": response.text
+                }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@mcp.tool()
+async def get_order_by_id(orderId: int) -> dict:
+    """Retrieve an order by its ID.
+    
+    Args:
+        orderId: The unique order identifier
+    
+    Returns:
+        Dictionary with order details
+    """
+    url = f"{order_service_config.base_url}/orders/{orderId}"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                url,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-request-id": f"mcp_{uuid.uuid4()}"
+                }
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "data": response.json()
+                }
+            elif response.status_code == 404:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": f"Order with ID '{orderId}' not found"
+                }
+            else:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": response.text
+                }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@mcp.tool()
+async def update_order(
+        orderId: int,
+        productName: str,
+        quantity: int,
+        price: int
+) -> dict:
+    """Update an existing order.
+    
+    Args:
+        orderId: The unique order identifier (required)
+        productName: Updated product name (required)
+        quantity: Updated quantity (required)
+        price: Updated price (required)
+    
+    Returns:
+        Dictionary with updated order details
+    """
+    # Build request payload
+    payload = {
+        "productName": productName,
+        "quantity": quantity,
+        "price": price
+    }
+    
+    url = f"{order_service_config.base_url}/orders/{orderId}"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                url,
+                json=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-request-id": f"mcp_{uuid.uuid4()}"
+                }
+            )
+            
+            if response.status_code == 200:
+                return {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "data": response.json()
+                }
+            elif response.status_code == 404:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": f"Order with ID '{orderId}' not found"
+                }
+            else:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": response.text
+                }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@mcp.tool()
+async def delete_order(orderId: int) -> dict:
+    """Delete an order by its ID.
+    
+    Args:
+        orderId: The unique order identifier
+    
+    Returns:
+        Dictionary with deletion status
+    """
+    url = f"{order_service_config.base_url}/orders/{orderId}"
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(
+                url,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-request-id": f"mcp_{uuid.uuid4()}"
+                }
+            )
+            
+            if response.status_code == 204:
+                return {
+                    "success": True,
+                    "status_code": response.status_code,
+                    "message": f"Order with ID '{orderId}' deleted successfully"
+                }
+            elif response.status_code == 404:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": f"Order with ID '{orderId}' not found"
+                }
+            else:
+                return {
+                    "success": False,
+                    "status_code": response.status_code,
+                    "error": response.text
+                }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 if __name__ == "__main__":
     # Validate required environment variables
     if not oauth_config.client_id or not oauth_config.client_secret:
@@ -509,6 +761,7 @@ if __name__ == "__main__":
         print("Warning: DB_USER and DB_PASSWORD not set - Database tools will not work")
     
     print(f"Product Service URL: {product_service_config.base_url}")
+    print(f"Order Service URL: {order_service_config.base_url}")
 
     # Run with stdio transport for desktop clients like Cursor
     mcp.run(transport="stdio")
