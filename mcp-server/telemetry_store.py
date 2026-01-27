@@ -22,6 +22,11 @@ class Span:
     status_code: str  # "OK", "ERROR", "UNSET"
     attributes: dict = field(default_factory=dict)
     events: list = field(default_factory=list)
+    # Code location information
+    code_filepath: Optional[str] = None
+    code_function: Optional[str] = None
+    code_lineno: Optional[int] = None
+    code_namespace: Optional[str] = None
     
     @property
     def duration_ms(self) -> float:
@@ -30,6 +35,11 @@ class Span:
     @property
     def is_error(self) -> bool:
         return self.status_code == "ERROR"
+    
+    @property
+    def has_code_info(self) -> bool:
+        """Check if span has code location information."""
+        return any([self.code_filepath, self.code_function, self.code_lineno, self.code_namespace])
 
 
 @dataclass
@@ -42,10 +52,20 @@ class LogRecord:
     trace_id: Optional[str] = None
     span_id: Optional[str] = None
     attributes: dict = field(default_factory=dict)
+    # Code location information
+    code_filepath: Optional[str] = None
+    code_function: Optional[str] = None
+    code_lineno: Optional[int] = None
+    code_namespace: Optional[str] = None
     
     @property
     def is_error(self) -> bool:
         return self.severity in ("ERROR", "FATAL")
+    
+    @property
+    def has_code_info(self) -> bool:
+        """Check if log has code location information."""
+        return any([self.code_filepath, self.code_function, self.code_lineno, self.code_namespace])
 
 
 @dataclass
@@ -100,7 +120,9 @@ class TelemetryStore:
         limit: int = 100,
         service: Optional[str] = None,
         errors_only: bool = False,
-        since: Optional[datetime] = None
+        since: Optional[datetime] = None,
+        code_filepath: Optional[str] = None,
+        code_function: Optional[str] = None
     ) -> list[Span]:
         """Get recent spans with optional filtering."""
         with self._lock:
@@ -113,6 +135,10 @@ class TelemetryStore:
             spans = [s for s in spans if s.is_error]
         if since:
             spans = [s for s in spans if s.start_time >= since]
+        if code_filepath:
+            spans = [s for s in spans if s.code_filepath and code_filepath in s.code_filepath]
+        if code_function:
+            spans = [s for s in spans if s.code_function and code_function in s.code_function]
         
         # Return most recent first
         spans.sort(key=lambda s: s.start_time, reverse=True)
@@ -124,7 +150,9 @@ class TelemetryStore:
         service: Optional[str] = None,
         severity: Optional[str] = None,
         errors_only: bool = False,
-        since: Optional[datetime] = None
+        since: Optional[datetime] = None,
+        code_filepath: Optional[str] = None,
+        code_function: Optional[str] = None
     ) -> list[LogRecord]:
         """Get recent logs with optional filtering."""
         with self._lock:
@@ -139,6 +167,10 @@ class TelemetryStore:
             logs = [l for l in logs if l.is_error]
         if since:
             logs = [l for l in logs if l.timestamp >= since]
+        if code_filepath:
+            logs = [l for l in logs if l.code_filepath and code_filepath in l.code_filepath]
+        if code_function:
+            logs = [l for l in logs if l.code_function and code_function in l.code_function]
         
         # Return most recent first
         logs.sort(key=lambda l: l.timestamp, reverse=True)
@@ -242,6 +274,23 @@ def parse_otel_timestamp(ts: Union[str, int, float]) -> datetime:
     return datetime.utcnow()
 
 
+def extract_code_info(attributes: dict) -> tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
+    """Extract code location information from attributes."""
+    filepath = attributes.get("code.filepath") or attributes.get("code.file")
+    function = attributes.get("code.function") or attributes.get("code.method")
+    lineno = attributes.get("code.lineno") or attributes.get("code.line")
+    namespace = attributes.get("code.namespace") or attributes.get("code.package")
+    
+    # Try to convert lineno to int if it's a string
+    if lineno is not None:
+        try:
+            lineno = int(lineno) if not isinstance(lineno, int) else lineno
+        except (ValueError, TypeError):
+            lineno = None
+    
+    return filepath, function, lineno, namespace
+
+
 def parse_span_from_otel(data: dict) -> Optional[Span]:
     """Parse a span from OTEL JSON format."""
     try:
@@ -263,6 +312,15 @@ def parse_span_from_otel(data: dict) -> Optional[Span]:
                 if isinstance(status_code, int):
                     status_code = ["UNSET", "OK", "ERROR"][min(status_code, 2)]
                 
+                # Extract attributes
+                attrs = {
+                    attr.get("key", ""): attr.get("value", {}).get("stringValue", str(attr.get("value", "")))
+                    for attr in span_data.get("attributes", [])
+                }
+                
+                # Extract code information
+                filepath, function, lineno, namespace = extract_code_info(attrs)
+                
                 span = Span(
                     trace_id=span_data.get("traceId", ""),
                     span_id=span_data.get("spanId", ""),
@@ -272,11 +330,12 @@ def parse_span_from_otel(data: dict) -> Optional[Span]:
                     start_time=parse_otel_timestamp(span_data.get("startTimeUnixNano", 0)),
                     end_time=parse_otel_timestamp(span_data.get("endTimeUnixNano", 0)),
                     status_code=status_code,
-                    attributes={
-                        attr.get("key", ""): attr.get("value", {}).get("stringValue", str(attr.get("value", "")))
-                        for attr in span_data.get("attributes", [])
-                    },
-                    events=span_data.get("events", [])
+                    attributes=attrs,
+                    events=span_data.get("events", []),
+                    code_filepath=filepath,
+                    code_function=function,
+                    code_lineno=lineno,
+                    code_namespace=namespace
                 )
                 spans.append(span)
         
@@ -314,6 +373,15 @@ def parse_log_from_otel(data: dict) -> Optional[list[LogRecord]]:
                 if isinstance(body, dict):
                     body = body.get("stringValue", str(body))
                 
+                # Extract attributes
+                attrs = {
+                    attr.get("key", ""): attr.get("value", {}).get("stringValue", str(attr.get("value", "")))
+                    for attr in log_data.get("attributes", [])
+                }
+                
+                # Extract code information
+                filepath, function, lineno, namespace = extract_code_info(attrs)
+                
                 log = LogRecord(
                     timestamp=parse_otel_timestamp(log_data.get("timeUnixNano", 0)),
                     severity=severity,
@@ -321,10 +389,11 @@ def parse_log_from_otel(data: dict) -> Optional[list[LogRecord]]:
                     service_name=service_name,
                     trace_id=log_data.get("traceId"),
                     span_id=log_data.get("spanId"),
-                    attributes={
-                        attr.get("key", ""): attr.get("value", {}).get("stringValue", str(attr.get("value", "")))
-                        for attr in log_data.get("attributes", [])
-                    }
+                    attributes=attrs,
+                    code_filepath=filepath,
+                    code_function=function,
+                    code_lineno=lineno,
+                    code_namespace=namespace
                 )
                 logs.append(log)
         

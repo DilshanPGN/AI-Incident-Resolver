@@ -119,7 +119,27 @@ The MCP server can be configured to access specific git repositories. Edit `git-
 }
 ```
 
-**Note:** Copy `git-repos.json.example` to `git-repos.json` and customize it with your repository URLs.
+### Server Instructions
+
+You can provide pre-defined instructions to guide the AI assistant on how to use this MCP server effectively. Edit `instructions.txt` to customize the instructions:
+
+```text
+# MCP Server Instructions
+
+This file contains instructions that guide the AI assistant on how to use this MCP server effectively.
+
+## Tool Usage Guidelines
+
+1. For Incident Analysis:
+   - Start with get_errors to identify recent failures
+   - Use analyze_incident for a comprehensive summary
+
+2. For Debugging:
+   - Use get_trace_by_id to follow a specific request
+   - Use get_recent_traces with errors_only=true
+```
+
+The instructions are automatically loaded when the server starts and are provided to the AI assistant to help it use the tools more effectively. You can customize `instructions.txt` with your own guidelines, best practices, or domain-specific instructions.
 
 ### Cursor MCP Configuration
 

@@ -36,8 +36,30 @@ except ImportError as e:
     print(f"Note: Make sure you're using the same Python interpreter that Cursor uses.", file=sys.stderr)
     raise
 
-# Initialize the MCP server
-server = Server("otel-incident-resolver")
+
+def load_instructions() -> Optional[str]:
+    """Load server instructions from configuration file."""
+    # Try to load from instructions.txt in the same directory as this script
+    script_dir = Path(__file__).parent
+    instructions_file = script_dir / "instructions.txt"
+    
+    if instructions_file.exists():
+        try:
+            with open(instructions_file, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                # Return the content as-is (markdown is fine for instructions)
+                return content if content else None
+        except Exception as e:
+            print(f"WARNING: Failed to load instructions from {instructions_file}: {e}", file=sys.stderr)
+    
+    return None
+
+
+# Load instructions from configuration file
+server_instructions = load_instructions()
+
+# Initialize the MCP server with instructions
+server = Server("otel-incident-resolver", instructions=server_instructions)
 
 # Global store and OTLP receiver
 store = TelemetryStore(max_spans=10000, max_logs=10000, max_metrics=5000)
@@ -46,7 +68,7 @@ otlp_receiver: Optional[OTLPReceiver] = None
 
 def format_span(span: Span) -> dict:
     """Format a span for JSON output."""
-    return {
+    result = {
         "trace_id": span.trace_id,
         "span_id": span.span_id,
         "parent_span_id": span.parent_span_id,
@@ -59,11 +81,27 @@ def format_span(span: Span) -> dict:
         "is_error": span.is_error,
         "attributes": span.attributes,
     }
+    
+    # Add code location information if available
+    if span.has_code_info:
+        code_info = {}
+        if span.code_filepath:
+            code_info["filepath"] = span.code_filepath
+        if span.code_function:
+            code_info["function"] = span.code_function
+        if span.code_lineno:
+            code_info["lineno"] = span.code_lineno
+        if span.code_namespace:
+            code_info["namespace"] = span.code_namespace
+        if code_info:
+            result["code_location"] = code_info
+    
+    return result
 
 
 def format_log(log: LogRecord) -> dict:
     """Format a log record for JSON output."""
-    return {
+    result = {
         "timestamp": log.timestamp.isoformat(),
         "severity": log.severity,
         "body": log.body,
@@ -73,6 +111,22 @@ def format_log(log: LogRecord) -> dict:
         "is_error": log.is_error,
         "attributes": log.attributes,
     }
+    
+    # Add code location information if available
+    if log.has_code_info:
+        code_info = {}
+        if log.code_filepath:
+            code_info["filepath"] = log.code_filepath
+        if log.code_function:
+            code_info["function"] = log.code_function
+        if log.code_lineno:
+            code_info["lineno"] = log.code_lineno
+        if log.code_namespace:
+            code_info["namespace"] = log.code_namespace
+        if code_info:
+            result["code_location"] = code_info
+    
+    return result
 
 
 def format_metric(metric: MetricDataPoint) -> dict:
@@ -330,6 +384,37 @@ async def list_tools() -> list[Tool]:
                 "properties": {}
             }
         ),
+        Tool(
+            name="get_code_locations",
+            description="Get traces and logs filtered by code location (filepath, function, line number). Useful for finding all telemetry from a specific file or function.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "filepath": {
+                        "type": "string",
+                        "description": "Filter by file path (partial match supported, e.g., 'OrderService.java')"
+                    },
+                    "function": {
+                        "type": "string",
+                        "description": "Filter by function/method name (partial match supported)"
+                    },
+                    "service": {
+                        "type": "string",
+                        "description": "Optional: Filter by service name"
+                    },
+                    "errors_only": {
+                        "type": "boolean",
+                        "description": "Only return errors (failed spans and error logs)",
+                        "default": False
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default: 50)",
+                        "default": 50
+                    }
+                }
+            }
+        ),
     ]
 
 
@@ -410,8 +495,31 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         
         errors = store.get_errors(limit=limit, since_minutes=since_minutes)
         
+        # Collect code locations from errors
+        error_code_locations = {}
+        for span in errors["error_spans"]:
+            if span.has_code_info:
+                loc_key = f"{span.code_filepath or 'unknown'}:{span.code_function or 'unknown'}"
+                if span.code_lineno:
+                    loc_key += f":{span.code_lineno}"
+                error_code_locations[loc_key] = error_code_locations.get(loc_key, 0) + 1
+        for log in errors["error_logs"]:
+            if log.has_code_info:
+                loc_key = f"{log.code_filepath or 'unknown'}:{log.code_function or 'unknown'}"
+                if log.code_lineno:
+                    loc_key += f":{log.code_lineno}"
+                error_code_locations[loc_key] = error_code_locations.get(loc_key, 0) + 1
+        
         result = {
-            "summary": errors["summary"],
+            "summary": {
+                **errors["summary"],
+                "code_locations_with_errors": len(error_code_locations)
+            },
+            "error_code_locations": dict(sorted(
+                error_code_locations.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:20]),
             "error_spans": [format_span(s) for s in errors["error_spans"]],
             "error_logs": [format_log(l) for l in errors["error_logs"]]
         }
@@ -444,6 +552,38 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             svc = log.service_name
             errors_by_service[svc] = errors_by_service.get(svc, 0) + 1
         
+        # Collect code locations from errors
+        error_code_locations = {}
+        for span in errors["error_spans"]:
+            if span.has_code_info:
+                loc_key = f"{span.code_filepath or 'unknown'}:{span.code_function or 'unknown'}"
+                if span.code_lineno:
+                    loc_key += f":{span.code_lineno}"
+                if loc_key not in error_code_locations:
+                    error_code_locations[loc_key] = {
+                        "filepath": span.code_filepath,
+                        "function": span.code_function,
+                        "lineno": span.code_lineno,
+                        "namespace": span.code_namespace,
+                        "error_count": 0
+                    }
+                error_code_locations[loc_key]["error_count"] += 1
+        
+        for log in errors["error_logs"]:
+            if log.has_code_info:
+                loc_key = f"{log.code_filepath or 'unknown'}:{log.code_function or 'unknown'}"
+                if log.code_lineno:
+                    loc_key += f":{log.code_lineno}"
+                if loc_key not in error_code_locations:
+                    error_code_locations[loc_key] = {
+                        "filepath": log.code_filepath,
+                        "function": log.code_function,
+                        "lineno": log.code_lineno,
+                        "namespace": log.code_namespace,
+                        "error_count": 0
+                    }
+                error_code_locations[loc_key]["error_count"] += 1
+        
         report = {
             "analysis_window": {
                 "since": since.isoformat(),
@@ -457,9 +597,21 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 "error_logs": len(errors["error_logs"]),
                 "error_rate_percent": round(error_rate, 2),
                 "slow_spans_count": len(slow_spans),
-                "affected_services": list(errors_by_service.keys())
+                "affected_services": list(errors_by_service.keys()),
+                "error_code_locations_count": len(error_code_locations)
             },
             "errors_by_service": errors_by_service,
+            "error_code_locations": [
+                {
+                    "location": loc_key,
+                    **loc_info
+                }
+                for loc_key, loc_info in sorted(
+                    error_code_locations.items(),
+                    key=lambda x: x[1]["error_count"],
+                    reverse=True
+                )[:20]
+            ],
             "recent_errors": {
                 "spans": [format_span(s) for s in errors["error_spans"][:10]],
                 "logs": [format_log(l) for l in errors["error_logs"][:10]]
@@ -469,7 +621,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     "name": s.name,
                     "service": s.service_name,
                     "duration_ms": s.duration_ms,
-                    "trace_id": s.trace_id
+                    "trace_id": s.trace_id,
+                    "code_location": {
+                        "filepath": s.code_filepath,
+                        "function": s.code_function,
+                        "lineno": s.code_lineno
+                    } if s.has_code_info else None
                 }
                 for s in sorted(slow_spans, key=lambda x: x.duration_ms, reverse=True)[:10]
             ],
@@ -489,6 +646,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             top_error_svc = max(errors_by_service, key=errors_by_service.get)
             report["recommendations"].append(
                 f"Service '{top_error_svc}' has the most errors ({errors_by_service[top_error_svc]}). Prioritize investigation."
+            )
+        if error_code_locations:
+            top_error_loc = max(error_code_locations.items(), key=lambda x: x[1]["error_count"])
+            report["recommendations"].append(
+                f"Code location '{top_error_loc[0]}' has {top_error_loc[1]['error_count']} errors. Review this code location."
             )
         
         return [TextContent(type="text", text=json.dumps(report, indent=2))]
@@ -554,6 +716,64 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         }
         
         return [TextContent(type="text", text=json.dumps(status, indent=2))]
+    
+    elif name == "get_code_locations":
+        filepath = arguments.get("filepath")
+        function = arguments.get("function")
+        service = arguments.get("service")
+        errors_only = arguments.get("errors_only", False)
+        limit = arguments.get("limit", 50)
+        
+        # Get spans and logs filtered by code location
+        spans = store.get_recent_spans(
+            limit=limit,
+            service=service,
+            errors_only=errors_only,
+            code_filepath=filepath,
+            code_function=function
+        )
+        
+        logs = store.get_recent_logs(
+            limit=limit,
+            service=service,
+            errors_only=errors_only,
+            code_filepath=filepath,
+            code_function=function
+        )
+        
+        # Count unique code locations
+        code_locations = set()
+        for span in spans:
+            if span.has_code_info:
+                loc = f"{span.code_filepath or 'unknown'}:{span.code_function or 'unknown'}"
+                if span.code_lineno:
+                    loc += f":{span.code_lineno}"
+                code_locations.add(loc)
+        for log in logs:
+            if log.has_code_info:
+                loc = f"{log.code_filepath or 'unknown'}:{log.code_function or 'unknown'}"
+                if log.code_lineno:
+                    loc += f":{log.code_lineno}"
+                code_locations.add(loc)
+        
+        result = {
+            "filters": {
+                "filepath": filepath,
+                "function": function,
+                "service": service,
+                "errors_only": errors_only
+            },
+            "summary": {
+                "spans_count": len(spans),
+                "logs_count": len(logs),
+                "unique_code_locations": len(code_locations)
+            },
+            "code_locations": sorted(code_locations),
+            "spans": [format_span(s) for s in spans],
+            "logs": [format_log(l) for l in logs]
+        }
+        
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
     
     else:
         return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]

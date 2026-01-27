@@ -19,3 +19,4 @@ uv.lock
 
 # MCP Configuration files
 mcp-server/git-repos.json
+# Note: instructions.txt is tracked so users can see the example, but can be customized
