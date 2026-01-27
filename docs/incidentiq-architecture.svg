@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 640" font-family="Segoe UI, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a"/>
+      <stop offset="100%" style="stop-color:#1e293b"/>
+    </linearGradient>
+    <linearGradient id="aiGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="otelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0ea5e9"/>
+      <stop offset="100%" style="stop-color:#0284c7"/>
+    </linearGradient>
+    <linearGradient id="mcpGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981"/>
+      <stop offset="100%" style="stop-color:#059669"/>
+    </linearGradient>
+    <linearGradient id="ghGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="100%" style="stop-color:#d97706"/>
+    </linearGradient>
+    <linearGradient id="baseGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ec4899"/>
+      <stop offset="100%" style="stop-color:#be185d"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="920" height="640" fill="url(#bg)"/>
+  <rect x="20" y="20" width="880" height="600" rx="12" fill="none" stroke="#334155" stroke-width="1"/>
+
+  <!-- Title -->
+  <text x="460" y="52" text-anchor="middle" fill="#f8fafc" font-size="22" font-weight="600">IncidentIQ  AI-Powered Distributed Incident Intelligence</text>
+  <text x="460" y="78" text-anchor="middle" fill="#94a3b8" font-size="13">Telemetry · Business Data · Code Context ’ Unified incident analysis in natural language</text>
+
+  <!-- Microservices layer -->
+  <g id="services">
+    <rect x="80" y="120" width="120" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+    <text x="140" y="148" text-anchor="middle" fill="#e2e8f0" font-size="12">order-service</text>
+    <text x="140" y="164" text-anchor="middle" fill="#64748b" font-size="10">:8080</text>
+
+    <rect x="220" y="120" width="120" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+    <text x="280" y="148" text-anchor="middle" fill="#e2e8f0" font-size="12">payment-service</text>
+    <text x="280" y="164" text-anchor="middle" fill="#64748b" font-size="10">:8081</text>
+
+    <rect x="360" y="120" width="120" height="56" rx="8" fill="#1e293b" stroke="#475569" stroke-width="1"/>
+    <text x="420" y="148" text-anchor="middle" fill="#e2e8f0" font-size="12">product-service</text>
+    <text x="420" y="164" text-anchor="middle" fill="#64748b" font-size="10">:8083</text>
+
+    <text x="500" y="148" fill="#64748b" font-size="11">Java Spring Boot +</text>
+    <text x="500" y="162" fill="#64748b" font-size="11">OTEL Java Agent</text>
+  </g>
+
+  <!-- OTLP arrows from services to collector -->
+  <path d="M200 176 L200 220 L340 220" fill="none" stroke="#0ea5e9" stroke-width="2" marker-end="url(#arrow)" opacity="0.9"/>
+  <path d="M340 176 L340 220" fill="none" stroke="#0ea5e9" stroke-width="2" marker-end="url(#arrow)" opacity="0.9"/>
+  <path d="M480 176 L480 220 L340 220" fill="none" stroke="#0ea5e9" stroke-width="2" marker-end="url(#arrow)" opacity="0.9"/>
+  <text x="290" y="212" text-anchor="middle" fill="#38bdf8" font-size="9">OTLP gRPC</text>
+
+  <!-- OTEL Collector -->
+  <rect x="260" y="230" width="160" height="70" rx="10" fill="url(#otelGrad)" stroke="#0c4a6e" stroke-width="1"/>
+  <text x="340" y="258" text-anchor="middle" fill="#fff" font-size="14" font-weight="600">OpenTelemetry Collector</text>
+  <text x="340" y="278" text-anchor="middle" fill="#bae6fd" font-size="10">Docker · :4317 gRPC · :4318 HTTP</text>
+  <text x="340" y="292" text-anchor="middle" fill="#7dd3fc" font-size="9">Single ingestion point</text>
+
+  <!-- Arrow collector to MCP -->
+  <path d="M340 300 L340 350 L460 350 L460 390" fill="none" stroke="#10b981" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="400" y="338" text-anchor="middle" fill="#34d399" font-size="9">OTLP ’ MCP :4319</text>
+
+  <!-- MCP Servers row -->
+  <g id="mcp-servers">
+    <!-- Telemetry MCP -->
+    <rect x="340" y="400" width="200" height="90" rx="10" fill="url(#mcpGrad)" stroke="#047857" stroke-width="1"/>
+    <text x="440" y="430" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">Telemetry MCP Server</text>
+    <text x="440" y="450" text-anchor="middle" fill="#a7f3d0" font-size="10">Traces · Logs · Metrics</text>
+    <text x="440" y="468" text-anchor="middle" fill="#6ee7b7" font-size="9">get_errors · analyze_incident ·</text>
+    <text x="440" y="482" text-anchor="middle" fill="#6ee7b7" font-size="9">get_service_health · get_code_locations</text>
+
+    <!-- Base MCP -->
+    <rect x="80" y="420" width="200" height="70" rx="10" fill="url(#baseGrad)" stroke="#9d174d" stroke-width="1"/>
+    <text x="180" y="450" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">Base MCP Server</text>
+    <text x="180" y="468" text-anchor="middle" fill="#fbcfe8" font-size="10">Entitlements · DB · Products · Orders</text>
+    <text x="180" y="484" text-anchor="middle" fill="#f9a8d4" font-size="9">APIs, read-only queries, CRUD</text>
+
+    <!-- GitHub MCP -->
+    <rect x="600" y="420" width="200" height="70" rx="10" fill="url(#ghGrad)" stroke="#b45309" stroke-width="1"/>
+    <text x="700" y="450" text-anchor="middle" fill="#fff" font-size="13" font-weight="600">GitHub MCP Server</text>
+    <text x="700" y="468" text-anchor="middle" fill="#fef3c7" font-size="10">Repos · Issues · PRs · Code search</text>
+    <text x="700" y="484" text-anchor="middle" fill="#fde68a" font-size="9">Change history &amp; context</text>
+  </g>
+
+  <!-- Arrows from Base and GitHub to AI -->
+  <path d="M180 420 L180 530 L460 530 L460 550" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arrow)" opacity="0.8"/>
+  <path d="M700 420 L700 530 L460 530" fill="none" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="4 2" marker-end="url(#arrow)" opacity="0.8"/>
+  <text x="180" y="535" text-anchor="middle" fill="#c4b5fd" font-size="8">MCP</text>
+  <text x="700" y="535" text-anchor="middle" fill="#c4b5fd" font-size="8">MCP</text>
+
+  <!-- AI / Cursor box -->
+  <rect x="280" y="550" width="360" height="56" rx="12" fill="url(#aiGrad)" stroke="#4338ca" stroke-width="1" filter="url(#glow)"/>
+  <text x="460" y="578" text-anchor="middle" fill="#fff" font-size="16" font-weight="600">AI Assistant (Cursor)  IncidentIQ</text>
+  <text x="460" y="596" text-anchor="middle" fill="#c7d2fe" font-size="11">Whats wrong? · Analyze incidents · Show traces for OrderService.java</text>
+
+  <!-- Context labels -->
+  <text x="40" y="458" fill="#94a3b8" font-size="10" font-style="italic">Business + data</text>
+  <text x="820" y="458" fill="#94a3b8" font-size="10" font-style="italic">Code context</text>
+
+  <!-- Model Context Protocol label -->
+  <rect x="730" y="90" width="160" height="28" rx="6" fill="#334155" stroke="#475569"/>
+  <text x="810" y="108" text-anchor="middle" fill="#94a3b8" font-size="11">Model Context Protocol (MCP)</text>
+</svg>

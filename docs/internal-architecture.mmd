@@ -1,0 +1,103 @@
+---
+title: AI Incident Resolver — Internal Architecture
+---
+
+flowchart TB
+    subgraph clients["MCP Clients"]
+        Cursor["Cursor AI / MCP Client"]
+    end
+
+    subgraph mcp_servers["MCP Servers"]
+        direction TB
+        
+        subgraph telemetry_mcp["Telemetry MCP Server (Python)"]
+            ServerPy["server.py\nMCP protocol + tools"]
+            OtlpRx["otlp_receiver.py\nOTLP gRPC server :4319"]
+            TelemetryStore["telemetry_store.py\nIn-memory store"]
+            ServerPy --> OtlpRx
+            ServerPy --> TelemetryStore
+        end
+
+        subgraph base_mcp["Base MCP Server (Python)"]
+            EntitlementStdio["entitlement-stdio.py\nor entitlement-sse.py"]
+            EntitlementStdio --> OAuth["OAuth client\nToken cache"]
+            EntitlementStdio --> HttpApi["HTTP client\n(httpx)"]
+            EntitlementStdio --> DbClient["MySQL connector"]
+        end
+
+        subgraph github_mcp["GitHub MCP Server (Go)"]
+            GhServer["github-mcp-server\nstdio or HTTP"]
+        end
+    end
+
+    subgraph telemetry_data["Telemetry Data Store"]
+        StoreDetail["In-memory (TelemetryStore)\n• Spans: 10,000 max\n• Logs: 10,000 max\n• Metrics: 5,000 max\n• FIFO eviction\n• Thread-safe deques"]
+    end
+
+    subgraph otel["OpenTelemetry Collector (Docker)"]
+        Collector["otel-collector-contrib"]
+        OtelRecv["Receivers:\n• OTLP gRPC :4317\n• OTLP HTTP :4318"]
+        OtelProc["Processors:\n• batch\n• memory_limiter\n• resource"]
+        OtelExport["Exporters:\n• debug (console)\n• otlp/mcp → :4319"]
+        Collector --> OtelRecv
+        OtelRecv --> OtelProc
+        OtelProc --> OtelExport
+    end
+
+    subgraph java_services["Java Microservices (Spring Boot)"]
+        OrderSvc["order-service\n:8080"]
+        PaymentSvc["payment-service\n:8081"]
+        ProductSvc["product-service\n:8083"]
+        JavaAgent["OpenTelemetry\nJava Agent"]
+        OrderSvc --> JavaAgent
+        PaymentSvc --> JavaAgent
+        ProductSvc --> JavaAgent
+    end
+
+    subgraph external_apis["External APIs & Data Stores"]
+        WileyOAuth["Wiley OAuth\n(WILEY_TOKEN_URL)\nclient_credentials"]
+        WileyAlm["Wiley ALM API\n(WILEY_ALM_BASE_URL)\n/v1/institutions\n/v1/institutions/entitlements"]
+        MySQL["MySQL\norder_management\n(DB_HOST:3306)\n• query_database\n• list_database_tables\n• describe_table"]
+        ProductApi["Product Service API\n:8083\n/api/products"]
+        OrderApi["Order Service API\n:8081\n/orders"]
+        GitHubApi["GitHub API\n(HTTPS)\nRepos, Issues, PRs,\nActions, etc."]
+    end
+
+    %% Protocols: MCP stdio/SSE from servers to Cursor
+    Cursor <-.->|"MCP stdio"| ServerPy
+    Cursor <-.->|"MCP stdio"| EntitlementStdio
+    Cursor <-.->|"MCP stdio\nor HTTP"| GhServer
+
+    %% Telemetry flow: Java -> Collector -> MCP
+    JavaAgent -->|"OTLP gRPC / OTLP HTTP"| OtelRecv
+    OtelExport -->|"OTLP gRPC\n(endpoint :4319)"| OtlpRx
+    OtlpRx --> TelemetryStore
+
+    %% Base MCP -> external
+    OAuth -->|"HTTPS POST\nx-www-form-urlencoded"| WileyOAuth
+    HttpApi -->|"HTTPS GET\nBearer token"| WileyAlm
+    HttpApi -->|"HTTP"| ProductApi
+    HttpApi -->|"HTTP"| OrderApi
+    DbClient -->|"TCP 3306\nMySQL protocol"| MySQL
+
+    %% GitHub MCP -> GitHub
+    GhServer -->|"HTTPS\nREST / GraphQL"| GitHubApi
+
+    %% Data store used by telemetry MCP
+    TelemetryStore -.->|"reads/writes"| StoreDetail
+
+    %% Styling
+    classDef mcp fill:#10b981,stroke:#047857,color:#fff
+    classDef otel fill:#0ea5e9,stroke:#0284c7,color:#fff
+    classDef java fill:#1e293b,stroke:#475569,color:#e2e8f0
+    classDef store fill:#6366f1,stroke:#4f46e5,color:#fff
+    classDef external fill:#64748b,stroke:#475569,color:#f1f5f9
+    classDef client fill:#8b5cf6,stroke:#6d28d9,color:#fff
+    class ServerPy,OtlpRx,TelemetryStore mcp
+    class EntitlementStdio,OAuth,HttpApi,DbClient mcp
+    class GhServer mcp
+    class Collector,OtelRecv,OtelProc,OtelExport otel
+    class OrderSvc,PaymentSvc,ProductSvc,JavaAgent java
+    class StoreDetail,MySQL store
+    class WileyOAuth,WileyAlm,ProductApi,OrderApi,GitHubApi external
+    class Cursor client
