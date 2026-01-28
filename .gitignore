@@ -11,3 +11,12 @@ wheels/
 .env
 .idea
 uv.lock
+/order-service/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+/payment-service/target/maven-status/maven-compiler-plugin/compile/default-compile/createdFiles.lst
+/order-service/target/
+/payment-service/target/
+/.vscode/settings.json
+
+# MCP Configuration files
+mcp-server/git-repos.json
+# Note: instructions.txt is tracked so users can see the example, but can be customized
